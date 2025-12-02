@@ -7,6 +7,12 @@ const int TMP36_PIN     = A0;   // Hőmérséklet
 const int HUMID_POT_PIN = A1;   // Páratartalom potméter
 const int BUTTON_PIN    = 2;    // Nyomógomb (INPUT_PULLUP)
 
+const int HALL_POT_PIN  = A2;   // Mágnesesség / "szélerősség" potméter
+const int LED_PIN       = 8;    // Figyelmeztető LED
+const int MOTOR_PIN     = 9;    // Motor PWM (tranzisztor bázis)
+
+int displayMode = 0;
+
 void readTempAndHumidity(float &temperatureC, int &humidity) {
   // Hőmérséklet TMP36-ból
   int rawTemp = analogRead(TMP36_PIN);
@@ -25,6 +31,27 @@ void handleButtonMode() {
   if (buttonState == LOW) {           // lenyomva
     displayMode = (displayMode + 1) % 4;  // 0-1-2-3-0-...
     delay(300);                      // debounce + egyszeri váltás nyomásonként
+  }
+}
+
+void readMagneticAndWind(int &magneticPercent, int &motorPWM, int &rawHall) {
+  rawHall = analogRead(HALL_POT_PIN);        // 0–1023
+  magneticPercent = map(rawHall, 0, 1023, 0, 100);
+  motorPWM = map(rawHall, 0, 1023, 0, 255);
+}
+
+// Motor vezérlése a kiszámolt PWM alapján
+void handleMotor(int motorPWM) {
+  analogWrite(MOTOR_PIN, motorPWM);
+}
+
+// LED vezérlése a "szélerősség" / mágnesesség alapján
+void handleLed(int rawHall) {
+  const int LED_THRESHOLD = 700; // 0-1023 tartományban
+  if (rawHall > LED_THRESHOLD) {
+    digitalWrite(LED_PIN, HIGH);
+  } else {
+    digitalWrite(LED_PIN, LOW);
   }
 }
 
@@ -73,4 +100,42 @@ void updateDisplay(float temperatureC, int humidity, int magneticPercent,
       }
       break;
   }
+}
+
+void setup() {
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(MOTOR_PIN, OUTPUT);
+
+  lcd.init();        // I2C LCD inicializálás
+  lcd.backlight();   // háttérvilágítás bekapcsolása
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Idojaras allomas");
+  lcd.setCursor(0, 1);
+  lcd.print("Init...");
+  delay(1500);
+}
+
+void loop() {
+  float temperatureC = 0.0;
+  int humidity = 0;
+  int magneticPercent = 0;
+  int motorPWM = 0;
+  int rawHall = 0;
+
+  // 1. rész: hőmérséklet + páratartalom + gomb
+  readTempAndHumidity(temperatureC, humidity);
+  handleButtonMode();
+
+  // 2. rész: mágnesesség / szél + motor + LED
+  readMagneticAndWind(magneticPercent, motorPWM, rawHall);
+  handleMotor(motorPWM);
+  handleLed(rawHall);
+
+  // Közös LCD frissítés a pillanatnyi displayMode alapján
+  updateDisplay(temperatureC, humidity, magneticPercent, motorPWM, rawHall);
+
+  delay(150);  // kicsi késleltetés
 }
