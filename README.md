@@ -12,6 +12,6 @@
 ### - DHT11
 ### - Kijelző
 ### - Nyomógomb
-### - Hall szenzor
+### - Analóg Hall szenzor(Potméterrel szimuláljuk)
 ### - Motor
 ### - Led
